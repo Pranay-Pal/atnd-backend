@@ -29,12 +29,16 @@ class ReportController extends Controller
             'end_date'       => ['nullable', 'date', 'after_or_equal:start_date'],
             'entity_id'      => ['nullable', 'integer'],
             'entity_type_id' => ['nullable', 'integer'],
+            'filters'        => ['nullable', 'array'],
+            'filters.*'      => ['nullable', 'array'],
+            'filters.*.*'    => ['integer'],
             'format'         => ['nullable', 'in:json,csv'],
             'per_page'       => ['nullable', 'integer', 'min:1', 'max:500'],
         ]);
 
-        $query = AttendanceLog::with('user:id,name,email,employee_id')
-            ->orderBy('recorded_at', 'desc');
+        // Prepare query
+        $query = AttendanceLog::with('user:id,name,member_uid')
+            ->where('tenant_id', $this->tenantManager->id());
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->integer('user_id'));
@@ -64,6 +68,15 @@ class ReportController extends Controller
             });
         }
 
+        if ($request->filled('filters')) {
+            $query->whereHas('user', function ($q) use ($request) {
+                $q->withoutGlobalScopes()->filterByEntities($request->input('filters'));
+            });
+        }
+
+        // Add order by after all filters
+        $query->orderBy('recorded_at', 'desc');
+
         if ($request->input('format') === 'csv') {
             return $this->exportCsv($query->get());
         }
@@ -76,14 +89,15 @@ class ReportController extends Controller
     private function exportCsv(\Illuminate\Support\Collection $logs): Response
     {
         $rows   = [];
-        $rows[] = implode(',', ['id', 'user_id', 'employee_id', 'name', 'type', 'recorded_at', 'similarity', 'device_id']);
+        // CSV Header
+        $rows[] = implode(',', ['id', 'user_id', 'member_uid', 'name', 'type', 'recorded_at', 'similarity', 'device_id']);
 
         foreach ($logs as $log) {
             $rows[] = implode(',', [
                 $log->id,
                 $log->user_id,
-                $log->user?->employee_id ?? '',
-                '"'.addslashes($log->user?->name ?? '').'"',
+                $log->user?->member_uid ?? '',
+                $log->user?->name ?? 'Unknown',
                 $log->type,
                 $log->recorded_at?->toIso8601String() ?? '',
                 $log->similarity ?? '',

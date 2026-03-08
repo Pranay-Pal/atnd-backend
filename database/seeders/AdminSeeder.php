@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\User;
+use App\Models\Admin;
 use App\Models\Tenant;
 
 class AdminSeeder extends Seeder
@@ -22,7 +22,7 @@ class AdminSeeder extends Seeder
             ['name' => 'Genskytech System', 'industry' => 'software']
         );
 
-        User::firstOrCreate(
+        Admin::firstOrCreate(
             ['email' => 'admin'],
             [
                 'name' => 'Super Admin',

@@ -19,15 +19,19 @@ class AdminEntityController extends Controller
 
     /**
      * GET /api/admin/entity-types
+     * Query Params: with_entities (boolean)
      */
-    public function indexTypes(): JsonResponse
+    public function indexTypes(Request $request): JsonResponse
     {
-        $types = TenantEntityType::where('tenant_id', $this->tenantManager->id())
+        $query = TenantEntityType::where('tenant_id', $this->tenantManager->id())
             ->withCount('entities')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return response()->json($types);
+        if ($request->boolean('with_entities')) {
+            $query->with('entities');
+        }
+
+        return response()->json($query->get());
     }
 
     /**

@@ -3,7 +3,7 @@ import api from '../utils/axios';
 import Modal from '../components/Modal';
 
 const EMPTY_FORM = {
-    name: '', email: '', employee_id: '', profile_picture_url: '', role: 'user', password: '',
+    name: '', member_uid: '',
 };
 
 function EntityBadge({ entities }) {
@@ -37,47 +37,47 @@ function FaceIcon({ enrolled }) {
 }
 
 export default function Users() {
-    const [users, setUsers]         = useState([]);
-    const [meta, setMeta]           = useState({ total: 0, last_page: 1, current_page: 1 });
-    const [loading, setLoading]     = useState(true);
+    const [users, setUsers] = useState([]);
+    const [meta, setMeta] = useState({ total: 0, last_page: 1, current_page: 1 });
+    const [loading, setLoading] = useState(true);
 
     // Filters
-    const [search, setSearch]           = useState('');
+    const [search, setSearch] = useState('');
     const [entityTypes, setEntityTypes] = useState([]);
     const [entityValues, setEntityValues] = useState([]);
     const [filterTypeId, setFilterTypeId] = useState('');
     const [filterEntityId, setFilterEntityId] = useState('');
-    const [page, setPage]               = useState(1);
+    const [page, setPage] = useState(1);
 
     // Modals
-    const [modal, setModal]         = useState(null); // 'create' | 'edit' | 'delete' | 'entities'
-    const [selected, setSelected]   = useState(null);
-    const [form, setForm]           = useState(EMPTY_FORM);
+    const [modal, setModal] = useState(null); // 'create' | 'edit' | 'delete' | 'entities'
+    const [selected, setSelected] = useState(null);
+    const [form, setForm] = useState(EMPTY_FORM);
     const [entityChecked, setEntityChecked] = useState([]);
     const [allEntitiesForSync, setAllEntitiesForSync] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
 
-    // Load entity types once for filter bar
+    // Load entity types once for filter bar, with eager-loaded values
     useEffect(() => {
-        api.get('/admin/entity-types').then((r) => setEntityTypes(r.data)).catch(() => {});
+        api.get('/admin/entity-types', { params: { with_entities: true } })
+            .then((r) => setEntityTypes(r.data)).catch(() => { });
     }, []);
 
-    // When filter type changes, load its values
+    // When filter type changes, derive its values synchronously
     useEffect(() => {
         setFilterEntityId('');
         setEntityValues([]);
         if (!filterTypeId) return;
-        api.get(`/admin/entity-types/${filterTypeId}/entities`)
-            .then((r) => setEntityValues(r.data))
-            .catch(() => {});
-    }, [filterTypeId]);
+        const type = entityTypes.find((t) => String(t.id) === String(filterTypeId));
+        if (type) setEntityValues(type.entities || []);
+    }, [filterTypeId, entityTypes]);
 
     const fetchUsers = useCallback(() => {
         setLoading(true);
         const params = { page, per_page: 15 };
-        if (search)        params.search         = search;
-        if (filterEntityId) params.entity_id     = filterEntityId;
+        if (search) params.search = search;
+        if (filterEntityId) params.entity_id = filterEntityId;
         else if (filterTypeId) params.entity_type_id = filterTypeId;
 
         api.get('/admin/users', { params })
@@ -85,7 +85,7 @@ export default function Users() {
                 setUsers(r.data.data ?? []);
                 setMeta({ total: r.data.total, last_page: r.data.last_page, current_page: r.data.current_page });
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false));
     }, [page, search, filterEntityId, filterTypeId]);
 
@@ -97,10 +97,8 @@ export default function Users() {
     const openEdit = (user) => {
         setSelected(user);
         setForm({
-            name: user.name, email: user.email,
-            employee_id: user.employee_id ?? '',
-            profile_picture_url: user.profile_picture_url ?? '',
-            role: user.role, password: '',
+            name: user.name,
+            member_uid: user.member_uid ?? '',
         });
         setFormError('');
         setModal('edit');
@@ -111,17 +109,18 @@ export default function Users() {
     const openEntities = async (user) => {
         setSelected(user);
         setFormError('');
-        // Load all entity types + values, pre-check user's current entities
-        const typesRes = await api.get('/admin/entity-types');
-        const types = typesRes.data;
-        const allValues = await Promise.all(
-            types.map((t) => api.get(`/admin/entity-types/${t.id}/entities`).then((r) => ({
-                type: t.name, typeId: t.id, entities: r.data,
-            })))
-        );
-        setAllEntitiesForSync(allValues);
-        setEntityChecked((user.entities ?? []).map((e) => e.id));
-        setModal('entities');
+        // Load the entire nested taxonomy tree in 1 request
+        try {
+            const typesRes = await api.get('/admin/entity-types', { params: { with_entities: true } });
+            const allValues = typesRes.data.map((t) => ({
+                type: t.name, typeId: t.id, entities: t.entities || [],
+            }));
+            setAllEntitiesForSync(allValues);
+            setEntityChecked((user.entities ?? []).map((e) => e.id));
+            setModal('entities');
+        } catch {
+            setFormError('Failed to load taxonomy tree.');
+        }
     };
 
     const closeModal = () => { setModal(null); setSelected(null); };
@@ -134,9 +133,7 @@ export default function Users() {
         setSubmitting(true);
         try {
             const body = { ...form };
-            if (!body.password) delete body.password;
-            if (!body.employee_id) delete body.employee_id;
-            if (!body.profile_picture_url) delete body.profile_picture_url;
+            if (!body.member_uid) delete body.member_uid;
             await api.post('/admin/users', body);
             closeModal();
             fetchUsers();
@@ -154,7 +151,7 @@ export default function Users() {
         setSubmitting(true);
         try {
             const body = { ...form };
-            if (!body.password) delete body.password;
+            if (!body.member_uid) delete body.member_uid;
             await api.put(`/admin/users/${selected.id}`, body);
             closeModal();
             fetchUsers();
@@ -208,36 +205,9 @@ export default function Users() {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
-                    <input name="email" type="email" required value={form.email} onChange={handleFormChange}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Member UID</label>
+                    <input name="member_uid" value={form.member_uid} onChange={handleFormChange}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Employee ID</label>
-                    <input name="employee_id" value={form.employee_id} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
-                    <select name="role" value={form.role} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Profile Picture URL</label>
-                    <input name="profile_picture_url" type="url" value={form.profile_picture_url} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="https://..." />
-                </div>
-                <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Password {modal === 'edit' && <span className="text-gray-400">(leave blank to keep current)</span>}
-                    </label>
-                    <input name="password" type="password" value={form.password} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        minLength={8} placeholder={modal === 'edit' ? '••••••••' : 'Min 8 characters'} />
                 </div>
             </div>
             {formError && (
@@ -306,7 +276,7 @@ export default function Users() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="p-6 space-y-3">
-                        {[1,2,3,4,5].map((i) => <div key={i} className="h-12 bg-gray-100 animate-pulse rounded" />)}
+                        {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-12 bg-gray-100 animate-pulse rounded" />)}
                     </div>
                 ) : users.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-16">No users found.</p>
@@ -317,7 +287,6 @@ export default function Users() {
                                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Groups</th>
                                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Face</th>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                 <th className="px-6 py-3" />
                             </tr>
                         </thead>
@@ -326,29 +295,17 @@ export default function Users() {
                                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            {user.profile_picture_url ? (
-                                                <img src={user.profile_picture_url} alt=""
-                                                    className="w-8 h-8 rounded-full object-cover bg-gray-100" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-xs">
-                                                    {user.name.charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-xs shrink-0">
+                                                {user.name.charAt(0).toUpperCase()}
+                                            </div>
                                             <div>
                                                 <p className="font-medium text-gray-900">{user.name}</p>
-                                                <p className="text-xs text-gray-400">{user.email}</p>
+                                                {user.member_uid && <p className="text-xs text-gray-400">UID: {user.member_uid}</p>}
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4"><EntityBadge entities={user.entities} /></td>
                                     <td className="px-6 py-4"><FaceIcon enrolled={user.has_face_enrolled} /></td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                                            user.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                            {user.role}
-                                        </span>
-                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-end gap-2">
                                             <button onClick={() => openEntities(user)}

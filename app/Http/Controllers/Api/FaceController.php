@@ -26,6 +26,9 @@ class FaceController extends Controller
     {
         $request->validate([
             'updated_after' => ['nullable', 'date'],
+            'filters'       => ['nullable', 'array'],
+            'filters.*'     => ['nullable', 'array'],
+            'filters.*.*'   => ['integer'],
         ]);
 
         $query = FaceEmbedding::with([
@@ -36,6 +39,12 @@ class FaceController extends Controller
 
         if ($request->filled('updated_after')) {
             $query->where('face_embeddings.updated_at', '>=', $request->input('updated_after'));
+        }
+
+        if ($request->filled('filters')) {
+            $query->whereHas('user', function ($q) use ($request) {
+                $q->withoutGlobalScopes()->filterByEntities($request->input('filters'));
+            });
         }
 
         $embeddings = $query->get()->map(function (FaceEmbedding $e) {
@@ -52,7 +61,6 @@ class FaceController extends Controller
             return [
                 'user_id'             => $e->user_id,
                 'name'                => $user?->name,
-                'profile_picture_url' => $user?->profile_picture_url,
                 'embedding'           => base64_encode($e->getRawOriginal('embedding')),
                 'model_version'       => $e->model_version,
                 'updated_at'          => $e->updated_at?->toIso8601String(),
@@ -69,17 +77,27 @@ class FaceController extends Controller
      */
     public function users(Request $request): JsonResponse
     {
+        $request->validate([
+            'filters'     => ['nullable', 'array'],
+            'filters.*'   => ['nullable', 'array'],
+            'filters.*.*' => ['integer'],
+        ]);
+
         $tenantId = $request->user()->tenant_id;
-        $users = User::withoutGlobalScopes()
+
+        $query = User::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['entities.type', 'faceEmbedding'])
-            ->get()
-            ->map(function ($user) {
+            ->with(['entities.type', 'faceEmbedding']);
+
+        if ($request->filled('filters')) {
+            $query->filterByEntities($request->input('filters'));
+        }
+
+        $users = $query->get()->map(function ($user) {
                 return [
                     'id'                  => $user->id,
                     'name'                => $user->name,
-                    'employee_id'         => $user->employee_id,
-                    'profile_picture_url' => $user->profile_picture_url,
+                    'member_uid'          => $user->employee_id,
                     'has_embedding'       => $user->faceEmbedding !== null,
                     'entities'            => $user->entities->map(fn ($e) => [
                         'type'  => $e->type?->name,

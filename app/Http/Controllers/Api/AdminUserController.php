@@ -24,6 +24,9 @@ class AdminUserController extends Controller
             'search'         => ['nullable', 'string', 'max:100'],
             'entity_id'      => ['nullable', 'integer'],
             'entity_type_id' => ['nullable', 'integer'],
+            'filters'        => ['nullable', 'array'],
+            'filters.*'      => ['nullable', 'array'],
+            'filters.*.*'    => ['integer'],
             'per_page'       => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
@@ -33,8 +36,7 @@ class AdminUserController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('employee_id', 'like', "%{$search}%");
+                  ->orWhere('member_uid', 'like', "%{$search}%");
             });
         }
 
@@ -50,6 +52,10 @@ class AdminUserController extends Controller
             );
         }
 
+        if ($request->filled('filters')) {
+            $query->filterByEntities($request->input('filters'));
+        }
+
         $users = $query->paginate($request->integer('per_page', 25));
 
         return response()->json($users->through(fn ($user) => $this->formatUser($user)));
@@ -57,29 +63,19 @@ class AdminUserController extends Controller
 
     /**
      * POST /api/admin/users
-     * Body: { name, email, employee_id?, profile_picture_url?, role?, password? }
+     * Body: { name, member_uid? }
      */
     public function store(Request $request): JsonResponse
     {
-        $tenantId = $this->tenantManager->id();
-
         $data = $request->validate([
             'name'                => ['required', 'string', 'max:255'],
-            'email'               => ['required', 'email', Rule::unique('users')->where('tenant_id', $tenantId)],
-            'employee_id'         => ['nullable', 'string', 'max:100'],
-            'profile_picture_url' => ['nullable', 'url', 'max:2048'],
-            'role'                => ['nullable', 'in:admin,user'],
-            'password'            => ['nullable', 'string', 'min:8'],
+            'member_uid'          => ['nullable', 'string', 'max:100', Rule::unique('users')->where('tenant_id', $this->tenantManager->id())],
         ]);
 
-        $user = User::withoutGlobalScopes()->create([
-            'tenant_id'           => $tenantId,
+        $user = User::create([
+            'tenant_id'           => $this->tenantManager->id(),
             'name'                => $data['name'],
-            'email'               => $data['email'],
-            'employee_id'         => $data['employee_id'] ?? null,
-            'profile_picture_url' => $data['profile_picture_url'] ?? null,
-            'role'                => $data['role'] ?? 'user',
-            'password'            => Hash::make($data['password'] ?? str()->random(16)),
+            'member_uid'          => $data['member_uid'] ?? null,
         ]);
 
         return response()->json($this->formatUser($user->load('entities.type')), 201);
@@ -97,7 +93,7 @@ class AdminUserController extends Controller
 
     /**
      * PUT /api/admin/users/{id}
-     * Body: any subset of { name, email, employee_id, profile_picture_url, role, password }
+     * Body: any subset of { name, member_uid }
      */
     public function update(Request $request, int $id): JsonResponse
     {
@@ -106,16 +102,8 @@ class AdminUserController extends Controller
 
         $data = $request->validate([
             'name'                => ['sometimes', 'string', 'max:255'],
-            'email'               => ['sometimes', 'email', Rule::unique('users')->where('tenant_id', $tenantId)->ignore($user->id)],
-            'employee_id'         => ['nullable', 'string', 'max:100'],
-            'profile_picture_url' => ['nullable', 'url', 'max:2048'],
-            'role'                => ['nullable', 'in:admin,user'],
-            'password'            => ['nullable', 'string', 'min:8'],
+            'member_uid'          => ['nullable', 'string', 'max:100', Rule::unique('users')->where('tenant_id', $tenantId)->ignore($user->id)],
         ]);
-
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
 
         $user->update($data);
 
@@ -155,10 +143,7 @@ class AdminUserController extends Controller
         return [
             'id'                  => $user->id,
             'name'                => $user->name,
-            'email'               => $user->email,
-            'employee_id'         => $user->employee_id,
-            'profile_picture_url' => $user->profile_picture_url,
-            'role'                => $user->role,
+            'member_uid'          => $user->member_uid,
             'has_face_enrolled'   => $user->relationLoaded('faceEmbedding')
                                         ? $user->faceEmbedding !== null
                                         : null,

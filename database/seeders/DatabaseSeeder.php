@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Device;
 use App\Models\Tenant;
-use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -35,12 +35,11 @@ class DatabaseSeeder extends Seeder
                 'api_key'   => $apiKey,
             ]);
 
-            // Sample employee
-            User::create([
+            // Sample organisation manager
+            Admin::create([
                 'tenant_id'   => $tenant->id,
                 'name'        => 'Jane Doe',
                 'email'       => 'jane@demo.local',
-                'employee_id' => 'EMP001',
                 'password'    => Hash::make('password'),
                 'role'        => 'organisation',
             ]);

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\TenantEntityType;
-use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -32,7 +32,7 @@ class TenantController extends Controller
             'industry' => 'required|string|max:50',
             // Default admin fields
             'admin_name' => 'required|string|max:255',
-            'admin_email' => 'required|email|unique:users,email',
+            'admin_email' => 'required|email|unique:admins,email',
             'admin_password' => 'required|string|min:8',
         ]);
 
@@ -45,7 +45,8 @@ class TenantController extends Controller
         ]);
 
         // 2. Create the Organization Admin for this tenant
-        User::create([
+        // 2. Create the Organization Admin for this tenant
+        Admin::create([
             'tenant_id' => $tenant->id,
             'name' => $validated['admin_name'],
             'email' => $validated['admin_email'],

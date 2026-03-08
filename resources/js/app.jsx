@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
 import EntityTypes from './pages/EntityTypes';
+import Devices from './pages/Devices';
 
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import OrganizationList from './pages/organizations/OrganizationList';
@@ -64,6 +65,7 @@ function App() {
                         <Route path="users" element={<Users />} />
                         <Route path="reports" element={<Reports />} />
                         <Route path="entity-types" element={<EntityTypes />} />
+                        <Route path="devices" element={<Devices />} />
                     </Route>
 
                     {/* Catch-all */}

@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
+use App\Models\Admin;
 use App\Services\TenantManager;
 use Closure;
 use Illuminate\Http\Request;
@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Guard for the React Admin Portal routes.
- * Ensures the authenticated actor is a User (not a Device) with role = 'admin',
+ * Ensures the authenticated actor is an Admin (not a Device) with role = 'organisation',
  * then sets the TenantManager so global scopes filter by their tenant.
  */
 class ResolveOrganisationTenant
@@ -21,7 +21,7 @@ class ResolveOrganisationTenant
     {
         $user = $request->user();
 
-        if (!$user instanceof User) {
+        if (!$user instanceof Admin) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 

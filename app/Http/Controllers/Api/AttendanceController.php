@@ -97,15 +97,25 @@ class AttendanceController extends Controller
     public function download(Request $request): JsonResponse
     {
         $request->validate([
-            'since' => ['nullable', 'date'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'since'       => ['nullable', 'date'],
+            'limit'       => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'filters'     => ['nullable', 'array'],
+            'filters.*'   => ['nullable', 'array'],
+            'filters.*.*' => ['integer'],
         ]);
 
-        $query = AttendanceLog::with('user:id,name,employee_id')
-            ->orderBy('recorded_at', 'asc');
+        // Prepare query
+        $query = AttendanceLog::with('user:id,name,member_uid')
+            ->where('tenant_id', $this->tenantManager->id());
 
         if ($request->filled('since')) {
             $query->where('updated_at', '>=', $request->input('since'));
+        }
+
+        if ($request->filled('filters')) {
+            $query->whereHas('user', function ($q) use ($request) {
+                $q->withoutGlobalScopes()->filterByEntities($request->input('filters'));
+            });
         }
 
         $logs = $query->limit($request->integer('limit', 500))->get();
@@ -121,7 +131,7 @@ class AttendanceController extends Controller
                 'user'        => $log->user ? [
                     'id'          => $log->user->id,
                     'name'        => $log->user->name,
-                    'employee_id' => $log->user->employee_id,
+                    'member_uid' => $log->user->member_uid,
                 ] : null,
             ])
         );

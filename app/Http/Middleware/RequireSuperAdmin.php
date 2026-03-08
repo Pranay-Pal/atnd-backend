@@ -2,14 +2,14 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
+use App\Models\Admin;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Guard for the Super Admin routes (Platform Administrator).
- * Ensures the authenticated actor is a User with role = 'admin'.
+ * Ensures the authenticated actor is an Admin with role = 'admin'.
  */
 class RequireSuperAdmin
 {
@@ -17,7 +17,7 @@ class RequireSuperAdmin
     {
         $user = $request->user();
 
-        if (!$user instanceof User) {
+        if (!$user instanceof Admin) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 

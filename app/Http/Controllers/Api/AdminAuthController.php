@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -25,13 +25,13 @@ class AdminAuthController extends Controller
         ]);
 
         if ($request->filled('email')) {
-            $user = User::withoutGlobalScopes()
+            $user = Admin::withoutGlobalScopes()
                 ->where('email', $request->email)
                 ->whereIn('role', ['admin', 'organisation'])
                 ->first();
         } else {
             // Master admin: password-only login to the first admin user
-            $user = User::withoutGlobalScopes()
+            $user = Admin::withoutGlobalScopes()
                 ->where('role', 'admin')
                 ->orderBy('id')
                 ->first();

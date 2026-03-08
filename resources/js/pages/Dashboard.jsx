@@ -4,8 +4,8 @@ import api from '../utils/axios';
 
 function StatCard({ label, value, icon, color, loading }) {
     const colors = {
-        blue:    { bg: 'bg-blue-100',    icon: 'text-blue-600' },
-        indigo:  { bg: 'bg-indigo-100',  icon: 'text-indigo-600' },
+        blue: { bg: 'bg-blue-100', icon: 'text-blue-600' },
+        indigo: { bg: 'bg-indigo-100', icon: 'text-indigo-600' },
         emerald: { bg: 'bg-emerald-100', icon: 'text-emerald-600' },
     };
     const c = colors[color] ?? colors.blue;
@@ -42,8 +42,8 @@ export default function Dashboard() {
             api.get('/admin/entity-types'),
         ]).then(([usersRes, logsRes, typesRes]) => {
             setStats({
-                users:       usersRes.data.total,
-                todayLogs:   logsRes.data.total,
+                users: usersRes.data.total,
+                todayLogs: logsRes.data.total,
                 entityTypes: typesRes.data.length,
             });
             setRecentLogs(logsRes.data.data ?? []);
@@ -125,16 +125,15 @@ export default function Dashboard() {
                                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3 font-medium text-gray-900">
                                         {log.user?.name ?? `User #${log.user_id}`}
-                                        {log.user?.employee_id && (
-                                            <span className="ml-2 text-xs text-gray-400">#{log.user.employee_id}</span>
+                                        {log.user?.member_uid && (
+                                            <span className="ml-2 text-xs text-gray-400">#{log.user.member_uid}</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-3">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            log.type === 'check_in'
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${log.type === 'check_in'
                                                 ? 'bg-emerald-100 text-emerald-700'
                                                 : 'bg-red-100 text-red-700'
-                                        }`}>
+                                            }`}>
                                             {log.type === 'check_in' ? 'Check In' : 'Check Out'}
                                         </span>
                                     </td>
@@ -151,9 +150,9 @@ export default function Dashboard() {
             {/* Quick nav */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                    { to: '/admin/users',        label: 'Manage Users',       desc: 'Add, edit and assign groups' },
-                    { to: '/admin/reports',      label: 'Attendance Reports',  desc: 'Filter by date, group or person' },
-                    { to: '/admin/entity-types', label: 'Taxonomy',            desc: 'Manage entity types and values' },
+                    { to: '/admin/users', label: 'Manage Users', desc: 'Add, edit and assign groups' },
+                    { to: '/admin/reports', label: 'Attendance Reports', desc: 'Filter by date, group or person' },
+                    { to: '/admin/entity-types', label: 'Taxonomy', desc: 'Manage entity types and values' },
                 ].map(({ to, label, desc }) => (
                     <Link
                         key={to}

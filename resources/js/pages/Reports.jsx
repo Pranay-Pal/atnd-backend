@@ -5,45 +5,39 @@ export default function Reports() {
     const today = new Date().toISOString().split('T')[0];
 
     // Filters
-    const [startDate, setStartDate]     = useState(today);
-    const [endDate, setEndDate]         = useState(today);
+    const [startDate, setStartDate] = useState(today);
+    const [endDate, setEndDate] = useState(today);
     const [entityTypes, setEntityTypes] = useState([]);
-    const [entityValues, setEntityValues] = useState([]);
-    const [filterTypeId, setFilterTypeId]   = useState('');
-    const [filterEntityId, setFilterEntityId] = useState('');
-    const [userId, setUserId]           = useState('');
+    const [selectedFilters, setSelectedFilters] = useState({}); // { [typeId]: entityId }
+    const [userId, setUserId] = useState('');
 
     // Data
-    const [logs, setLogs]       = useState([]);
-    const [meta, setMeta]       = useState({ total: 0, last_page: 1, current_page: 1 });
+    const [logs, setLogs] = useState([]);
+    const [meta, setMeta] = useState({ total: 0, last_page: 1, current_page: 1 });
     const [loading, setLoading] = useState(false);
-    const [page, setPage]       = useState(1);
+    const [page, setPage] = useState(1);
     const [exporting, setExporting] = useState(false);
 
-    // Load entity types once
+    // Load entity types once with eager-loaded values
     useEffect(() => {
-        api.get('/admin/entity-types').then((r) => setEntityTypes(r.data)).catch(() => {});
+        api.get('/admin/entity-types', { params: { with_entities: true } })
+            .then((r) => setEntityTypes(r.data)).catch(() => { });
     }, []);
-
-    // Load entity values when type changes
-    useEffect(() => {
-        setFilterEntityId('');
-        setEntityValues([]);
-        if (!filterTypeId) return;
-        api.get(`/admin/entity-types/${filterTypeId}/entities`)
-            .then((r) => setEntityValues(r.data))
-            .catch(() => {});
-    }, [filterTypeId]);
 
     const buildParams = useCallback(() => {
         const p = { page, per_page: 20 };
-        if (startDate)       p.start_date      = startDate;
-        if (endDate)         p.end_date        = endDate;
-        if (filterEntityId)  p.entity_id       = filterEntityId;
-        else if (filterTypeId) p.entity_type_id = filterTypeId;
-        if (userId)          p.user_id         = userId;
+        if (startDate) p.start_date = startDate;
+        if (endDate) p.end_date = endDate;
+        if (userId) p.user_id = userId;
+
+        // Collect all non-empty entity selections into a single AND group
+        const filters = Object.values(selectedFilters).filter(Boolean).map(Number);
+        if (filters.length > 0) {
+            p.filters = [filters];
+        }
+
         return p;
-    }, [page, startDate, endDate, filterEntityId, filterTypeId, userId]);
+    }, [page, startDate, endDate, selectedFilters, userId]);
 
     const fetchLogs = useCallback(() => {
         setLoading(true);
@@ -52,7 +46,7 @@ export default function Reports() {
                 setLogs(r.data.data ?? []);
                 setMeta({ total: r.data.total, last_page: r.data.last_page, current_page: r.data.current_page });
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false));
     }, [buildParams]);
 
@@ -66,9 +60,9 @@ export default function Reports() {
                 params,
                 responseType: 'blob',
             });
-            const url  = URL.createObjectURL(res.data);
+            const url = URL.createObjectURL(res.data);
             const link = document.createElement('a');
-            link.href  = url;
+            link.href = url;
             link.download = `attendance_${startDate}_${endDate}.csv`;
             link.click();
             URL.revokeObjectURL(url);
@@ -119,35 +113,31 @@ export default function Reports() {
                             onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
                             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Entity Type</label>
-                        <select value={filterTypeId} onChange={(e) => { setFilterTypeId(e.target.value); setPage(1); }}
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">All Types</option>
-                            {entityTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                    </div>
-                    {entityValues.length > 0 && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">
-                                {entityTypes.find((t) => String(t.id) === filterTypeId)?.name ?? 'Value'}
-                            </label>
-                            <select value={filterEntityId} onChange={(e) => { setFilterEntityId(e.target.value); setPage(1); }}
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {entityTypes.map(type => (
+                        <div key={type.id}>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">{type.name}</label>
+                            <select
+                                value={selectedFilters[type.id] || ''}
+                                onChange={(e) => {
+                                    setSelectedFilters(prev => ({ ...prev, [type.id]: e.target.value }));
+                                    setPage(1);
+                                }}
+                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
                                 <option value="">All</option>
-                                {entityValues.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                {type.entities?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                             </select>
                         </div>
-                    )}
+                    ))}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">User ID</label>
                         <input type="number" placeholder="Any" value={userId}
                             onChange={(e) => { setUserId(e.target.value); setPage(1); }}
                             className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
-                    {(filterTypeId || filterEntityId || userId) && (
+                    {(Object.values(selectedFilters).some(Boolean) || userId) && (
                         <button
-                            onClick={() => { setFilterTypeId(''); setFilterEntityId(''); setUserId(''); setPage(1); }}
+                            onClick={() => { setSelectedFilters({}); setUserId(''); setPage(1); }}
                             className="text-xs text-gray-400 hover:text-gray-600 underline self-end pb-2.5"
                         >
                             Clear filters
@@ -160,7 +150,7 @@ export default function Reports() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="p-6 space-y-3">
-                        {[1,2,3,4,5].map((i) => <div key={i} className="h-11 bg-gray-100 animate-pulse rounded" />)}
+                        {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-11 bg-gray-100 animate-pulse rounded" />)}
                     </div>
                 ) : logs.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-16">No records for the selected filters.</p>
@@ -179,16 +169,15 @@ export default function Reports() {
                                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-3 font-medium text-gray-900">
                                         {log.user?.name ?? `#${log.user_id}`}
-                                        {log.user?.employee_id && (
-                                            <span className="ml-2 text-xs text-gray-400">({log.user.employee_id})</span>
+                                        {log.user?.member_uid && (
+                                            <span className="ml-2 text-xs text-gray-400">({log.user.member_uid})</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-3">
-                                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            log.type === 'check_in'
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-red-100 text-red-700'
-                                        }`}>
+                                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${log.type === 'check_in'
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-red-100 text-red-700'
+                                            }`}>
                                             {log.type === 'check_in' ? 'Check In' : 'Check Out'}
                                         </span>
                                     </td>

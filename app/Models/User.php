@@ -3,40 +3,24 @@
 namespace App\Models;
 
 use App\Scopes\TenantScope;
+use App\Traits\FilterableByEntities;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Model;
 
-class User extends Authenticatable
+class User extends Model
 {
-    use Notifiable, HasApiTokens;
+    use FilterableByEntities;
 
     protected $fillable = [
         'tenant_id',
         'name',
-        'email',
-        'employee_id',
-        'profile_picture_url',
-        'role',
-        'password',
+        'member_uid',
     ];
 
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
 
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-        ];
-    }
 
     protected static function booted(): void
     {

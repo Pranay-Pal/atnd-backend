@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminAuthController;
+use App\Http\Controllers\Api\AdminDeviceController;
 use App\Http\Controllers\Api\AdminEntityController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -81,6 +82,11 @@ Route::middleware(['auth:sanctum', ResolveOrganisationTenant::class])->prefix('a
     Route::get('/entity-types/{typeId}/entities',                [AdminEntityController::class, 'indexEntities']);
     Route::post('/entity-types/{typeId}/entities',               [AdminEntityController::class, 'storeEntity']);
     Route::delete('/entities/{id}',                              [AdminEntityController::class, 'destroyEntity']);
+
+    // Device management
+    Route::get('/devices',                  [AdminDeviceController::class, 'index']);
+    Route::post('/devices',                 [AdminDeviceController::class, 'store']);
+    Route::delete('/devices/{id}',          [AdminDeviceController::class, 'destroy']);
 
     // Reports (admin-scoped)
     Route::get('/reports/attendance', [ReportController::class, 'attendance']);
