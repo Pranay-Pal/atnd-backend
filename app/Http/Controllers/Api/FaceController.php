@@ -98,7 +98,7 @@ class FaceController extends Controller
                 return [
                     'id'                  => $user->id,
                     'name'                => $user->name,
-                    'member_uid'          => $user->employee_id,
+                    'member_uid'          => $user->member_uid,
                     'has_embedding'       => $user->faceEmbedding !== null,
                     'entities'            => $this->hydrateTaxonomies($user),
                 ];

@@ -29,7 +29,7 @@ class AdminUserController extends Controller
             'filters.*.*'    => ['integer'],
             'per_page'       => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
-        $query = User::orderBy('name');
+        $query = User::with(['faceEmbedding'])->orderBy('name');
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
