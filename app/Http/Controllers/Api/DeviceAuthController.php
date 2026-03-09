@@ -64,40 +64,6 @@ class DeviceAuthController extends Controller
     }
 
     /**
-     * POST /api/auth/login
-     * Body: { api_key: string }
-     * Returns: { token: string, device: {...} }
-     */
-    public function login(Request $request): JsonResponse
-    {
-        $request->validate([
-            'api_key' => ['required', 'string'],
-        ]);
-
-        $device = Device::where('api_key', $request->api_key)->first();
-
-        if (!$device) {
-            return response()->json(['message' => 'Invalid API key.'], 401);
-        }
-
-        // Revoke all existing tokens for this device before issuing a new one
-        $device->tokens()->delete();
-
-        $token = $device->createToken('device-token')->plainTextToken;
-
-        $device->updateQuietly(['last_seen_at' => now()]);
-
-        return response()->json([
-            'token'  => $token,
-            'device' => [
-                'id'        => $device->id,
-                'name'      => $device->name,
-                'tenant_id' => $device->tenant_id,
-            ],
-        ]);
-    }
-
-    /**
      * POST /api/auth/logout
      * Revokes the current Bearer token.
      */

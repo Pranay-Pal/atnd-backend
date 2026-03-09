@@ -21,9 +21,6 @@ Route::get('/ping', fn () => response()->json(['status' => 'ok']));
 // Phase 1: tablet provisioning — domain + api_key → token + branding + entity_types
 Route::post('/device/register', [DeviceAuthController::class, 'register']);
 
-// Legacy device login (api_key only, kept for backward compatibility)
-Route::post('/auth/login', [DeviceAuthController::class, 'login']);
-
 // Admin portal login — email + password → admin Bearer token
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
 

@@ -31,11 +31,7 @@ class FaceController extends Controller
             'filters.*.*'   => ['integer'],
         ]);
 
-        $query = FaceEmbedding::with([
-            'user',
-            'user.entities',
-            'user.entities.type',
-        ]);
+        $query = FaceEmbedding::with(['user']);
 
         if ($request->filled('updated_after')) {
             $query->where('face_embeddings.updated_at', '>=', $request->input('updated_after'));
@@ -51,11 +47,16 @@ class FaceController extends Controller
             $user = $e->getRelation('user');
 
             $entities = [];
-            if ($user && $user->relationLoaded('entities')) {
-                $entities = $user->entities->map(fn ($entity) => [
-                    'type'  => $entity->type?->name,
-                    'value' => $entity->name,
-                ])->values()->all();
+            if ($user && !empty($user->taxonomy_properties)) {
+                $entityIds = array_values($user->taxonomy_properties);
+                // Hydrate entities for Face payload (Optional cache hit opportunity here)
+                $entities = \App\Models\TenantEntity::with('type')
+                    ->whereIn('id', $entityIds)
+                    ->get()
+                    ->map(fn ($entity) => [
+                        'type'  => $entity->type?->name,
+                        'value' => $entity->name,
+                    ])->values()->all();
             }
 
             return [
@@ -87,7 +88,7 @@ class FaceController extends Controller
 
         $query = User::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->with(['entities.type', 'faceEmbedding']);
+            ->with(['faceEmbedding']);
 
         if ($request->filled('filters')) {
             $query->filterByEntities($request->input('filters'));
@@ -99,14 +100,27 @@ class FaceController extends Controller
                     'name'                => $user->name,
                     'member_uid'          => $user->employee_id,
                     'has_embedding'       => $user->faceEmbedding !== null,
-                    'entities'            => $user->entities->map(fn ($e) => [
-                        'type'  => $e->type?->name,
-                        'value' => $e->name,
-                    ])->values()->all(),
+                    'entities'            => $this->hydrateTaxonomies($user),
                 ];
             });
 
         return response()->json($users);
+    }
+
+    private function hydrateTaxonomies(User $user): array
+    {
+        $props = $user->taxonomy_properties;
+        if (empty($props)) {
+            return [];
+        }
+
+        $entityIds = array_values($props);
+        $entities = \App\Models\TenantEntity::with('type')->whereIn('id', $entityIds)->get();
+
+        return $entities->map(fn ($e) => [
+            'type'  => $e->type?->name,
+            'value' => $e->name,
+        ])->values()->toArray();
     }
 
     /**

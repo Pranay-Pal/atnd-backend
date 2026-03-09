@@ -80,9 +80,16 @@ class AdminEntityController extends Controller
             ->findOrFail($typeId);
 
         $entities = $type->entities()
-            ->withCount('users')
             ->orderBy('name')
             ->get();
+
+        // Inject the users_count manually by querying the native JSON taxonomy mappings
+        foreach ($entities as $entity) {
+            $entity->users_count = \App\Models\User::whereRaw(
+                "JSON_SEARCH(taxonomy_properties, 'one', ?) IS NOT NULL", 
+                [(string) $entity->id]
+            )->count();
+        }
 
         return response()->json($entities);
     }

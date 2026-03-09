@@ -18,7 +18,20 @@ class User extends Model
         'tenant_id',
         'name',
         'member_uid',
+        'taxonomy_properties',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'taxonomy_properties' => 'array',
+        ];
+    }
 
 
 
@@ -45,10 +58,5 @@ class User extends Model
     public function attendanceLogs(): HasMany
     {
         return $this->hasMany(AttendanceLog::class);
-    }
-
-    public function entities(): BelongsToMany
-    {
-        return $this->belongsToMany(TenantEntity::class, 'entity_user');
     }
 }

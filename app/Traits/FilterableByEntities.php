@@ -5,7 +5,7 @@ namespace App\Traits;
 trait FilterableByEntities
 {
     /**
-     * Apply an advanced AND/OR entity filter scope to the query.
+     * Apply an advanced AND/OR entity filter scope to the query using JSON operations.
      *
      * Format of $filters array:
      * [
@@ -35,11 +35,23 @@ trait FilterableByEntities
 
                 $q->orWhere(function ($subQ) use ($andGroup) {
                     // To satisfy an AND group, the user MUST have ALL entities
-                    // in the array. We enforce this by checking that the count 
-                    // of matching entities equals the size of the array.
-                    $subQ->whereHas('entities', function ($entityQ) use ($andGroup) {
-                        $entityQ->whereIn('tenant_entities.id', $andGroup);
-                    }, '=', count($andGroup));
+                    // in the array. Since we store data as {"TypeID": "EntityID"},
+                    // and we only have EntityIDs in the array, we can use JSON_CONTAINS 
+                    // dynamically on just the values.
+                    
+                    // JSON_CONTAINS(column, document) checks if the column contains the given JSON
+                    // In Laravel, whereJsonContains allows checking an array of values where
+                    // EACH must be present (doing it iteratively creates an AND chain)
+                    foreach ($andGroup as $entityId) {
+                         // We don't precisely know the TypeID key here, but MySQL's 
+                         // JSON_CONTAINS can search for the existence of the value
+                         // anywhere within the object if formatted correctly.
+                         // However, checking just the values is tricky in SQL if the keys are dynamic.
+                         
+                         // The safest way to do "Contains this value regardless of key" natively
+                         // JSON_SEARCH returns the path to the value if it exists, or NULL.
+                         $subQ->whereRaw("JSON_SEARCH(taxonomy_properties, 'one', ?) IS NOT NULL", [(string) $entityId]);
+                    }
                 });
             }
         });

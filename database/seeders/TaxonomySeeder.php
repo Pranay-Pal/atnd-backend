@@ -35,7 +35,11 @@ class TaxonomySeeder extends Seeder
             ['email' => 'jane@acmeschool.org'],
             ['tenant_id' => $school->id, 'name' => 'Jane Student', 'password' => bcrypt('password'), 'role' => 'organisation']
         );
-        $student->entities()->syncWithoutDetaching([$grade10->id, $sectionA->id]);
+        $student->taxonomy_properties = [
+            (string) $classType->id => $grade10->id,
+            (string) $sectionType->id => $sectionA->id,
+        ];
+        $student->save();
 
 
         // 2. Create a Gym Tenant
@@ -55,6 +59,9 @@ class TaxonomySeeder extends Seeder
             ['email' => 'jack@gmail.com'],
             ['tenant_id' => $gym->id, 'name' => 'Jack Lifter', 'password' => bcrypt('password'), 'role' => 'organisation']
         );
-        $member->entities()->syncWithoutDetaching([$premiumTier->id]);
+        $member->taxonomy_properties = [
+            (string) $membershipType->id => $premiumTier->id,
+        ];
+        $member->save();
     }
 }

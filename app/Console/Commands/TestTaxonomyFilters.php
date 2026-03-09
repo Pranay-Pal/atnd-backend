@@ -35,19 +35,31 @@ class TestTaxonomyFilters extends Command
             ['name' => 'John (10-A)'],
             ['tenant_id' => $tenant->id]
         );
-        $user1->entities()->sync([$class10->id, $secA->id]);
+        $user1->taxonomy_properties = [
+            (string) $typeClass->id => $class10->id,
+            (string) $typeSec->id   => $secA->id,
+        ];
+        $user1->save();
 
         $user2 = User::withoutGlobalScopes()->updateOrCreate(
             ['name' => 'Jane (10-B)'],
             ['tenant_id' => $tenant->id]
         );
-        $user2->entities()->sync([$class10->id, $secB->id]);
+        $user2->taxonomy_properties = [
+            (string) $typeClass->id => $class10->id,
+            (string) $typeSec->id   => $secB->id,
+        ];
+        $user2->save();
 
         $user3 = User::withoutGlobalScopes()->updateOrCreate(
             ['name' => 'Bob (9-A)'],
             ['tenant_id' => $tenant->id]
         );
-        $user3->entities()->sync([$class9->id, $secA->id]);
+        $user3->taxonomy_properties = [
+            (string) $typeClass->id => $class9->id,
+            (string) $typeSec->id   => $secA->id,
+        ];
+        $user3->save();
 
 
         // --- Test 1: Empty Array (Entire School) ---

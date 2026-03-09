@@ -92,7 +92,7 @@ export default function Users() {
     useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
     // ── Helpers ──────────────────────────────────────────
-    const openCreate = () => { setForm(EMPTY_FORM); setFormError(''); setModal('create'); };
+    const openCreate = () => { setForm(EMPTY_FORM); setEntityChecked([]); setFormError(''); setModal('create'); };
 
     const openEdit = (user) => {
         setSelected(user);
@@ -132,7 +132,7 @@ export default function Users() {
         setFormError('');
         setSubmitting(true);
         try {
-            const body = { ...form };
+            const body = { ...form, entity_ids: entityChecked };
             if (!body.member_uid) delete body.member_uid;
             await api.post('/admin/users', body);
             closeModal();
@@ -196,35 +196,71 @@ export default function Users() {
     };
 
     // ── Form shared markup ──────────────────────────────
-    const UserForm = ({ onSubmit, submitLabel }) => (
-        <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
-                    <input name="name" required value={form.name} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    const UserForm = ({ onSubmit, submitLabel, showEntities }) => {
+        const derivedEntities = entityTypes.map((t) => ({
+            type: t.name, typeId: t.id, entities: t.entities || [],
+        }));
+
+        return (
+            <form onSubmit={onSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
+                        <input name="name" required value={form.name} onChange={handleFormChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Member UID</label>
+                        <input name="member_uid" value={form.member_uid} onChange={handleFormChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
                 </div>
-                <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Member UID</label>
-                    <input name="member_uid" value={form.member_uid} onChange={handleFormChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+                {showEntities && derivedEntities.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                        <p className="text-sm font-medium text-gray-700 mb-3">Assign Groups (Optional)</p>
+                        <div className="space-y-4 max-h-48 overflow-y-auto pr-2">
+                            {derivedEntities.map(({ type, entities }) => (
+                                <div key={type}>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{type}</p>
+                                    <div className="space-y-1.5 pl-1">
+                                        {entities.map((e) => (
+                                            <label key={e.id} className="flex items-center gap-3 cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={entityChecked.includes(e.id)}
+                                                    onChange={() => toggleEntity(e.id)}
+                                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700 group-hover:text-gray-900">{e.name}</span>
+                                            </label>
+                                        ))}
+                                        {entities.length === 0 && (
+                                            <p className="text-xs text-gray-400 italic">No values defined yet.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {formError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{formError}</p>
+                )}
+                <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={closeModal}
+                        className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled={submitting}
+                        className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium">
+                        {submitting ? 'Saving…' : submitLabel}
+                    </button>
                 </div>
-            </div>
-            {formError && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{formError}</p>
-            )}
-            <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeModal}
-                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                    Cancel
-                </button>
-                <button type="submit" disabled={submitting}
-                    className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium">
-                    {submitting ? 'Saving…' : submitLabel}
-                </button>
-            </div>
-        </form>
-    );
+            </form>
+        );
+    };
 
     return (
         <div className="max-w-7xl mx-auto space-y-6">
@@ -348,12 +384,12 @@ export default function Users() {
 
             {/* Create modal */}
             <Modal open={modal === 'create'} onClose={closeModal} title="Add User">
-                <UserForm onSubmit={handleCreate} submitLabel="Create User" />
+                <UserForm onSubmit={handleCreate} submitLabel="Create User" showEntities={true} />
             </Modal>
 
             {/* Edit modal */}
             <Modal open={modal === 'edit'} onClose={closeModal} title={`Edit — ${selected?.name}`}>
-                <UserForm onSubmit={handleUpdate} submitLabel="Save Changes" />
+                <UserForm onSubmit={handleUpdate} submitLabel="Save Changes" showEntities={false} />
             </Modal>
 
             {/* Delete confirm */}

@@ -52,7 +52,7 @@ class DatabaseSeeder extends Seeder
             $this->command->info("Tenant   : {$tenant->name} (id={$tenant->id})");
             $this->command->info("Device   : {$device->name} (id={$device->id})");
             $this->command->info("API Key  : {$apiKey}");
-            $this->command->info("Use this API key to call POST /api/auth/login");
+            $this->command->info("Use this API key and domain ($tenant->domain) to call POST /api/device/register");
         } else {
             $this->command->info("Production environment detected. Only core Admin provisioned.");
         }

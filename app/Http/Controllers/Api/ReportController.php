@@ -54,17 +54,18 @@ class ReportController extends Controller
 
         if ($request->filled('entity_id')) {
             $query->whereHas('user', function ($q) use ($request) {
-                $q->withoutGlobalScopes()->whereHas('entities', function ($q2) use ($request) {
-                    $q2->where('tenant_entities.id', $request->integer('entity_id'));
-                });
+                // JSON payload: {"1": 5} -> Check if '5' exists as a value in the JSON object
+                $q->withoutGlobalScopes()
+                  ->whereRaw("JSON_SEARCH(taxonomy_properties, 'one', ?) IS NOT NULL", [(string) $request->integer('entity_id')]);
             });
         }
 
         if ($request->filled('entity_type_id')) {
             $query->whereHas('user', function ($q) use ($request) {
-                $q->withoutGlobalScopes()->whereHas('entities.type', function ($q2) use ($request) {
-                    $q2->where('tenant_entity_types.id', $request->integer('entity_type_id'));
-                });
+                // If the user has ANY value assigned to this Type
+                // Ex: Is there ANY key "2" inside the JSON {"1": 5, "2": 12}? Yes.
+                $q->withoutGlobalScopes()
+                  ->whereRaw("JSON_EXTRACT(taxonomy_properties, '$.\"" . $request->integer('entity_type_id') . "\"') IS NOT NULL");
             });
         }
 
@@ -83,7 +84,33 @@ class ReportController extends Controller
 
         $logs = $query->paginate($request->integer('per_page', 50));
 
+        // Format entities inside the embedded user relations
+        $logs->getCollection()->transform(function ($log) {
+            if ($log->user) {
+                // Attach real array formatted entities alongside the raw JSON taxonomy property list
+                $log->user->entities = $this->hydrateTaxonomies($log->user);
+            }
+            return $log;
+        });
+
         return response()->json($logs);
+    }
+
+    private function hydrateTaxonomies(\App\Models\User $user): array
+    {
+        $props = $user->taxonomy_properties;
+        if (empty($props)) {
+            return [];
+        }
+
+        $entityIds = array_values($props);
+        $entities = \App\Models\TenantEntity::with('type')->whereIn('id', $entityIds)->get();
+
+        return $entities->map(fn ($e) => [
+            'id'    => $e->id,
+            'type'  => $e->type?->name,
+            'value' => $e->name,
+        ])->values()->toArray();
     }
 
     private function exportCsv(\Illuminate\Support\Collection $logs): Response

@@ -31,11 +31,6 @@ All endpoints are prefixed with `/api`.
   }
   ```
 
-### `POST /api/auth/login`
-- **Description:** Device login to retrieve a new token via API key.
-- **Request Body:** `{ "api_key": "string" }`
-- **Returns (200):** `{ "token": "...", "device": { "id": 1, "name": "Tablet", "tenant_id": 1 } }`
-
 ### `POST /api/admin/login`
 - **Description:** Admin and SuperAdmin login endpoint for the React SPA.
 - **Request Body:**
@@ -164,9 +159,8 @@ All endpoints are prefixed with `/api`.
   ```json
   {
     "name": "string",
-    "email": "string|email",
     "member_uid": "string", // optional
-    "password": "password" // optional default string 
+    "entity_ids": [1, 2, 5] // optional
   }
   ```
 
