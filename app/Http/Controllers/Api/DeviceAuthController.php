@@ -44,11 +44,20 @@ class DeviceAuthController extends Controller
         $device->updateQuietly(['last_seen_at' => now()]);
 
         $entityTypes = TenantEntityType::where('tenant_id', $tenant->id)
-            ->with(['entities' => function ($query) {
-                $query->select('id', 'tenant_entity_type_id', 'name');
-            }])
+            ->with(['entities:id,tenant_entity_type_id,name'])
             ->orderBy('name')
-            ->get(['id', 'name', 'is_required']);
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id'          => $type->id,
+                    'name'        => $type->name,
+                    'is_required' => $type->is_required,
+                    'entities'    => $type->entities->map(fn ($e) => [
+                        'id'   => $e->id,
+                        'name' => $e->name,
+                    ]),
+                ];
+            });
 
         return response()->json([
             'token'  => $token,
