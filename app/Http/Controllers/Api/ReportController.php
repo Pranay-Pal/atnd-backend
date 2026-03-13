@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceLog;
+use App\Services\TenantManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ReportController extends Controller
 {
+    public function __construct(private TenantManager $tenantManager) {}
+
     /**
      * GET /api/reports/attendance
      * Query params:
@@ -37,7 +40,7 @@ class ReportController extends Controller
         ]);
 
         // Prepare query
-        $query = AttendanceLog::with('user:id,name,member_uid')
+        $query = AttendanceLog::with('user:id,name,member_uid,taxonomy_properties')
             ->where('tenant_id', $this->tenantManager->id());
 
         if ($request->filled('user_id')) {
@@ -77,18 +80,48 @@ class ReportController extends Controller
 
         // Add order by after all filters
         $query->orderBy('recorded_at', 'desc');
+        
+        $isCsv = $request->input('format') === 'csv';
+        $logs = $isCsv ? $query->get() : $query->paginate($request->integer('per_page', 50));
 
-        if ($request->input('format') === 'csv') {
-            return $this->exportCsv($query->get());
+        // Group-fetch taxonomy properties to prevent N+1
+        $allEntityIds = [];
+        $items = $isCsv ? $logs : $logs->items();
+        foreach ($items as $log) {
+            if ($log->user && !empty($log->user->taxonomy_properties)) {
+                $allEntityIds = array_merge($allEntityIds, array_values($log->user->taxonomy_properties));
+            }
+        }
+        $allEntityIds = array_unique($allEntityIds);
+
+        $entitiesDict = [];
+        if (!empty($allEntityIds)) {
+            $fetched = \App\Models\TenantEntity::with('type')->whereIn('id', $allEntityIds)->get();
+            foreach ($fetched as $e) {
+                $entitiesDict[$e->id] = [
+                    'id'    => $e->id,
+                    'type'  => $e->type?->name,
+                    'value' => $e->name,
+                ];
+            }
         }
 
-        $logs = $query->paginate($request->integer('per_page', 50));
+        if ($isCsv) {
+            return $this->exportCsv($logs, $entitiesDict);
+        }
 
         // Format entities inside the embedded user relations
-        $logs->getCollection()->transform(function ($log) {
+        $logs->getCollection()->transform(function ($log) use ($entitiesDict) {
             if ($log->user) {
-                // Attach real array formatted entities alongside the raw JSON taxonomy property list
-                $log->user->entities = $this->hydrateTaxonomies($log->user);
+                $userEntities = [];
+                if (!empty($log->user->taxonomy_properties)) {
+                    foreach (array_values($log->user->taxonomy_properties) as $eid) {
+                        if (isset($entitiesDict[$eid])) {
+                            $userEntities[] = $entitiesDict[$eid];
+                        }
+                    }
+                }
+                $log->user->entities = $userEntities;
             }
             return $log;
         });
@@ -96,39 +129,33 @@ class ReportController extends Controller
         return response()->json($logs);
     }
 
-    private function hydrateTaxonomies(\App\Models\User $user): array
-    {
-        $props = $user->taxonomy_properties;
-        if (empty($props)) {
-            return [];
-        }
-
-        $entityIds = array_values($props);
-        $entities = \App\Models\TenantEntity::with('type')->whereIn('id', $entityIds)->get();
-
-        return $entities->map(fn ($e) => [
-            'id'    => $e->id,
-            'type'  => $e->type?->name,
-            'value' => $e->name,
-        ])->values()->toArray();
-    }
-
-    private function exportCsv(\Illuminate\Support\Collection $logs): Response
+    private function exportCsv(\Illuminate\Support\Collection $logs, array $entitiesDict): Response
     {
         $rows   = [];
         // CSV Header
-        $rows[] = implode(',', ['id', 'user_id', 'member_uid', 'name', 'type', 'recorded_at', 'similarity', 'device_id']);
+        $rows[] = implode(',', ['id', 'user_id', 'member_uid', 'name', 'type', 'recorded_at', 'similarity', 'device_id', 'taxonomy']);
 
         foreach ($logs as $log) {
+            $taxArray = [];
+            if ($log->user && !empty($log->user->taxonomy_properties)) {
+                foreach (array_values($log->user->taxonomy_properties) as $eid) {
+                    if (isset($entitiesDict[$eid])) {
+                        $taxArray[] = $entitiesDict[$eid]['type'] . ': ' . $entitiesDict[$eid]['value'];
+                    }
+                }
+            }
+            $taxStr = implode('; ', $taxArray);
+
             $rows[] = implode(',', [
                 $log->id,
                 $log->user_id,
-                $log->user?->member_uid ?? '',
-                $log->user?->name ?? 'Unknown',
+                $this->escapeCsv($log->user?->member_uid ?? ''),
+                $this->escapeCsv($log->user?->name ?? 'Unknown'),
                 $log->type,
                 $log->recorded_at?->toIso8601String() ?? '',
                 $log->similarity ?? '',
                 $log->device_id ?? '',
+                $this->escapeCsv($taxStr),
             ]);
         }
 
@@ -138,5 +165,13 @@ class ReportController extends Controller
             'Content-Type'        => 'text/csv',
             'Content-Disposition' => 'attachment; filename="attendance_report.csv"',
         ]);
+    }
+
+    private function escapeCsv(string $value): string
+    {
+        if (str_contains($value, ',') || str_contains($value, '"') || str_contains($value, "\n")) {
+            return '"' . str_replace('"', '""', $value) . '"';
+        }
+        return $value;
     }
 }

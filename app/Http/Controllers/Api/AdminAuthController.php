@@ -68,4 +68,28 @@ class AdminAuthController extends Controller
 
         return response()->json(['message' => 'Logged out.']);
     }
+
+    /**
+     * POST /api/admin/password
+     * Body: { current_password, new_password, new_password_confirmation }
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 400);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->new_password),
+        ]);
+
+        return response()->json(['message' => 'Password updated successfully.']);
+    }
 }

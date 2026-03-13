@@ -52,11 +52,13 @@ class OrganisationBrandingController extends Controller
             // Delete old logo if exists
             if (isset($settings['logo_url'])) {
                 $oldPath = str_replace(url('/storage/'), '', $settings['logo_url']);
-                Storage::disk('public')->delete($oldPath);
+                // Also handle cases where logo_url might be absolute without url() helper
+                $oldPath = str_replace(Storage::disk('public')->url(''), '', $settings['logo_url']);
+                Storage::disk('public')->delete(ltrim($oldPath, '/'));
             }
 
             $path = $request->file('logo')->store('branding', 'public');
-            $settings['logo_url'] = url(Storage::url($path));
+            $settings['logo_url'] = Storage::disk('public')->url($path);
         }
 
         $tenant->settings = $settings;

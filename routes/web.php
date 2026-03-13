@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/setup', function () {
+    if (env('APP_ENV') === 'production' && !env('ALLOW_SETUP', false)) {
+        return response()->json(['error' => 'Setup is disabled. Please set ALLOW_SETUP=true in .env'], 403);
+    }
+
     try {
         // 1. Verify database connection
         \DB::connection()->getPdo();
@@ -12,7 +16,7 @@ Route::get('/setup', function () {
         
         // 3. Provision Super Admin ONLY if it doesn't already exist
         $adminProvisoned = false;
-        if (!\App\Models\User::where('role', 'admin')->exists()) {
+        if (!\App\Models\Admin::where('role', 'admin')->exists()) {
             \Artisan::call('db:seed', ['--class' => 'Database\Seeders\AdminSeeder', '--force' => true]);
             $adminProvisoned = true;
         }

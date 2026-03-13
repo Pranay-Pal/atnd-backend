@@ -53,7 +53,28 @@ class AdminUserController extends Controller
 
         $users = $query->paginate($request->integer('per_page', 25));
 
-        return response()->json($users->through(fn ($user) => $this->formatUser($user)));
+        // Bulk load all entity IDs to prevent N+1 Queries
+        $allEntityIds = [];
+        foreach ($users->items() as $user) {
+            if (!empty($user->taxonomy_properties)) {
+                $allEntityIds = array_merge($allEntityIds, array_values($user->taxonomy_properties));
+            }
+        }
+        $allEntityIds = array_unique($allEntityIds);
+
+        $entitiesDict = [];
+        if (!empty($allEntityIds)) {
+            $fetched = \App\Models\TenantEntity::with('type')->whereIn('id', $allEntityIds)->get();
+            foreach ($fetched as $e) {
+                $entitiesDict[$e->id] = [
+                    'id'    => $e->id,
+                    'type'  => $e->type?->name,
+                    'value' => $e->name,
+                ];
+            }
+        }
+
+        return response()->json($users->through(fn ($user) => $this->formatUser($user, $entitiesDict)));
     }
 
     /**
@@ -66,7 +87,13 @@ class AdminUserController extends Controller
             'name'                => ['required', 'string', 'max:255'],
             'member_uid'          => ['nullable', 'string', 'max:100', Rule::unique('users')->where('tenant_id', $this->tenantManager->id())],
             'entity_ids'          => ['nullable', 'array'],
-            'entity_ids.*'        => ['integer', 'exists:tenant_entities,id'],
+            'entity_ids.*'        => [
+                'integer',
+                Rule::exists('tenant_entities', 'id')->where(function ($query) {
+                    return $query->join('tenant_entity_types', 'tenant_entities.tenant_entity_type_id', '=', 'tenant_entity_types.id')
+                                 ->where('tenant_entity_types.tenant_id', $this->tenantManager->id());
+                }),
+            ],
         ]);
 
         $user = User::create([
@@ -132,7 +159,13 @@ class AdminUserController extends Controller
     {
         $data = $request->validate([
             'entity_ids'   => ['required', 'array'],
-            'entity_ids.*' => ['integer', 'exists:tenant_entities,id'],
+            'entity_ids.*' => [
+                'integer',
+                Rule::exists('tenant_entities', 'id')->where(function ($query) {
+                    return $query->join('tenant_entity_types', 'tenant_entities.tenant_entity_type_id', '=', 'tenant_entity_types.id')
+                                 ->where('tenant_entity_types.tenant_id', $this->tenantManager->id());
+                }),
+            ],
         ]);
 
         $user = User::findOrFail($id);
@@ -149,7 +182,7 @@ class AdminUserController extends Controller
         return response()->json($this->formatUser($user));
     }
 
-    private function formatUser(User $user): array
+    private function formatUser(User $user, array|null $entitiesDict = null): array
     {
         return [
             'id'                  => $user->id,
@@ -160,21 +193,32 @@ class AdminUserController extends Controller
                                         : null,
             // Format entities out of the JSON properties 
             // The JSON is built like: {"1": 5, "2": 12}
-            'entities'            => $this->hydrateTaxonomies($user),
+            'entities'            => $this->hydrateTaxonomies($user, $entitiesDict),
             'created_at'          => $user->created_at?->toIso8601String(),
         ];
     }
 
-    private function hydrateTaxonomies(User $user): array
+    private function hydrateTaxonomies(User $user, array|null $entitiesDict = null): array
     {
         $props = $user->taxonomy_properties;
         if (empty($props)) {
             return [];
         }
 
-        // We need the type and value names for the frontend presentation.
-        // E.g. {"1": 5} -> [{"id": 5, "type": "Class", "value": "10"}]
         $entityIds = array_values($props);
+
+        // Group bulk fetch usage
+        if ($entitiesDict !== null) {
+            $userEntities = [];
+            foreach ($entityIds as $eid) {
+                if (isset($entitiesDict[$eid])) {
+                    $userEntities[] = $entitiesDict[$eid];
+                }
+            }
+            return $userEntities;
+        }
+
+        // Single usage fallback
         $entities = \App\Models\TenantEntity::with('type')->whereIn('id', $entityIds)->get();
 
         return $entities->map(fn ($e) => [

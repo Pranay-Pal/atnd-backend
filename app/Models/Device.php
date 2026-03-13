@@ -24,6 +24,11 @@ class Device extends Model
         'last_seen_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new \App\Scopes\TenantScope());
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

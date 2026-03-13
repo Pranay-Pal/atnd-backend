@@ -34,6 +34,8 @@ axiosInstance.interceptors.response.use(
             localStorage.removeItem('admin_user');
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
+                // Return a pending promise so the app doesn't throw before the redirect happens
+                return new Promise(() => {});
             }
         }
         return Promise.reject(error);

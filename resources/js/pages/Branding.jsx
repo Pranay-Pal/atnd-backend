@@ -20,6 +20,14 @@ export default function Branding() {
         fetchBranding();
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (preview) {
+                URL.revokeObjectURL(preview);
+            }
+        };
+    }, [preview]);
+
     const fetchBranding = async () => {
         try {
             const response = await api.get('/admin/branding');

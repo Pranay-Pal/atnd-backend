@@ -15,6 +15,7 @@ import Reports from './pages/Reports';
 import EntityTypes from './pages/EntityTypes';
 import Devices from './pages/Devices';
 import Branding from './pages/Branding';
+import Settings from './pages/Settings';
 
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import OrganizationList from './pages/organizations/OrganizationList';
@@ -53,6 +54,7 @@ function App() {
                         <Route path="tenants" element={<OrganizationList />} />
                         <Route path="tenants/new" element={<OrganizationForm />} />
                         <Route path="tenants/:id/edit" element={<OrganizationEdit />} />
+                        <Route path="settings" element={<Settings />} />
                     </Route>
 
                     {/* ORGANIZATION ADMIN ROUTES */}
@@ -70,6 +72,7 @@ function App() {
                         <Route path="entity-types" element={<EntityTypes />} />
                         <Route path="devices" element={<Devices />} />
                         <Route path="branding" element={<Branding />} />
+                        <Route path="settings" element={<Settings />} />
                     </Route>
 
                     {/* Catch-all */}

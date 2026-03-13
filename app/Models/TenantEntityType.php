@@ -8,6 +8,11 @@ class TenantEntityType extends Model
 {
     protected $fillable = ['tenant_id', 'name', 'is_required'];
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new \App\Scopes\TenantScope());
+    }
+
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);

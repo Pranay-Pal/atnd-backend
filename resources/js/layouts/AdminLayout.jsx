@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/axios';
 
 const NAV = [
     {
@@ -51,13 +52,40 @@ const NAV = [
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         ),
     },
+    {
+        name: 'Settings',
+        path: '/admin/settings',
+        icon: (
+            <>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </>
+        ),
+    },
 ];
 
 export default function AdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [branding, setBranding] = useState({ name: 'AtndSaaS', logo_url: null });
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+
+    useEffect(() => {
+        const fetchBranding = async () => {
+            try {
+                const res = await api.get('/admin/branding');
+                setBranding({
+                    name: res.data.name,
+                    logo_url: res.data.settings?.logo_url
+                });
+            } catch (err) {
+                console.error('Failed to load branding', err);
+            }
+        };
+        fetchBranding();
+    }, []);
 
     const handleLogout = async () => {
         await logout();
@@ -83,8 +111,17 @@ export default function AdminLayout() {
             {/* Sidebar */}
             <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl flex flex-col transform transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 {/* Brand */}
-                <div className="flex items-center justify-center h-16 bg-blue-700 flex-shrink-0">
-                    <span className="text-white text-xl font-bold tracking-wider">AtndSaaS</span>
+                <div className="flex items-center px-6 h-16 bg-blue-700 flex-shrink-0">
+                    {branding.logo_url ? (
+                        <img src={branding.logo_url} alt="Logo" className="h-8 w-auto mr-3" />
+                    ) : (
+                        <div className="h-8 w-8 bg-blue-500 rounded flex items-center justify-center text-white mr-3">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                    )}
+                    <span className="text-white text-lg font-bold tracking-tight truncate">{branding.name}</span>
                 </div>
 
                 {/* Nav links */}

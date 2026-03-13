@@ -8,6 +8,7 @@ use App\Models\TenantEntityType;
 use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TenantController extends Controller
@@ -114,11 +115,11 @@ class TenantController extends Controller
 
         if ($request->hasFile('logo')) {
             if (isset($settings['logo_url'])) {
-                $oldPath = str_replace(url('/storage/'), '', $settings['logo_url']);
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
+                $oldPath = str_replace(Storage::disk('public')->url(''), '', $settings['logo_url']);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete(ltrim($oldPath, '/'));
             }
             $path = $request->file('logo')->store('branding', 'public');
-            $settings['logo_url'] = url(\Illuminate\Support\Facades\Storage::url($path));
+            $settings['logo_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
         }
 
         $tenant->settings = $settings;

@@ -68,6 +68,7 @@ Route::middleware(['auth:sanctum', ResolveOrganisationTenant::class])->prefix('a
 
     // Auth
     Route::post('/logout', [AdminAuthController::class, 'logout']);
+    Route::post('/password', [AdminAuthController::class, 'changePassword']);
 
     // User management
     Route::get('/users',                    [AdminUserController::class, 'index']);

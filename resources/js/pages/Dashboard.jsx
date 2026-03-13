@@ -98,7 +98,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                     <h2 className="text-base font-semibold text-gray-800">Today's Recent Activity</h2>
-                    <Link to="/reports" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <Link to="/admin/reports" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                         View all →
                     </Link>
                 </div>

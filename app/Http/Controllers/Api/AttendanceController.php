@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceLog;
 use App\Models\User;
+use App\Services\TenantManager;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
+    public function __construct(private TenantManager $tenantManager) {}
+
     /**
      * POST /api/attendance/check-in
      * Body: { user_id: int, recorded_at?: ISO8601, similarity?: float }
@@ -64,6 +68,30 @@ class AttendanceController extends Controller
             if (!$user) {
                 $failed[] = ['local_id' => $rec['local_id'], 'reason' => 'User not found.'];
                 continue;
+            }
+
+            // 1. Network Idempotency (prevent double sync if device retries)
+            $existingSync = AttendanceLog::where('tenant_id', $tenantId)
+                ->where('device_id', $device->id)
+                ->where('metadata->local_id', $rec['local_id'])
+                ->first();
+            
+            if ($existingSync) {
+                $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existingSync->id];
+                continue;
+            }
+
+            // 2. Business Logic Guard (no double check-ins per day)
+            if ($rec['type'] === 'check_in') {
+                $existing = AttendanceLog::where('user_id', $rec['user_id'])
+                    ->where('tenant_id', $tenantId)
+                    ->where('type', 'check_in')
+                    ->whereDate('recorded_at', Carbon::parse($rec['recorded_at'])->toDateString())
+                    ->first();
+                if ($existing) {
+                    $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existing->id];
+                    continue;
+                }
             }
 
             $log = AttendanceLog::create([
@@ -155,11 +183,25 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'User not found in tenant.'], 404);
         }
 
+        $recordedAt = $data['recorded_at'] ?? now();
+
+        if ($type === 'check_in') {
+            $existing = AttendanceLog::where('user_id', $data['user_id'])
+                ->where('tenant_id', $tenantId)
+                ->where('type', 'check_in')
+                ->whereDate('recorded_at', Carbon::parse($recordedAt)->toDateString())
+                ->first();
+            
+            if ($existing) {
+                return response()->json($existing, 200);
+            }
+        }
+
         $log = AttendanceLog::create([
             'tenant_id'   => $tenantId,
             'user_id'     => $data['user_id'],
             'type'        => $type,
-            'recorded_at' => $data['recorded_at'] ?? now(),
+            'recorded_at' => $recordedAt,
             'device_id'   => $device->id,
             'similarity'  => $data['similarity'] ?? null,
             'synced'      => true,
