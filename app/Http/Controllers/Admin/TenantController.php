@@ -88,6 +88,49 @@ class TenantController extends Controller
     }
 
     /**
+     * Update the specified tenant.
+     */
+    public function update(Request $request, string $id)
+    {
+        $tenant = Tenant::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'          => 'sometimes|string|max:255',
+            'domain'        => 'sometimes|string|max:255|unique:tenants,domain,' . $id,
+            'industry'      => 'sometimes|string|max:50',
+            'primary_color' => 'sometimes|string|regex:/^#([A-Fa-f0-9]{6})$/',
+            'logo'          => 'sometimes|image|mimes:jpeg,png,jpg,svg|max:2048',
+        ]);
+
+        if (isset($validated['name']))   $tenant->name = $validated['name'];
+        if (isset($validated['domain'])) $tenant->domain = $validated['domain'];
+        if (isset($validated['industry'])) $tenant->industry = $validated['industry'];
+
+        $settings = $tenant->settings ?? [];
+
+        if (isset($validated['primary_color'])) {
+            $settings['primary_color'] = $validated['primary_color'];
+        }
+
+        if ($request->hasFile('logo')) {
+            if (isset($settings['logo_url'])) {
+                $oldPath = str_replace(url('/storage/'), '', $settings['logo_url']);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
+            }
+            $path = $request->file('logo')->store('branding', 'public');
+            $settings['logo_url'] = url(\Illuminate\Support\Facades\Storage::url($path));
+        }
+
+        $tenant->settings = $settings;
+        $tenant->save();
+
+        return response()->json([
+            'message' => 'Organization updated successfully',
+            'tenant' => $tenant
+        ]);
+    }
+
+    /**
      * Remove the specified tenant from storage.
      */
     public function destroy(string $id)

@@ -76,6 +76,12 @@ export default function OrganizationList() {
                                     </td>
                                     <td className="px-6 py-4 text-slate-500">{org.users_count}</td>
                                     <td className="px-6 py-4 text-right space-x-3">
+                                        <Link
+                                            to={`/super-admin/tenants/${org.id}/edit`}
+                                            className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                        >
+                                            Edit
+                                        </Link>
                                         <button
                                             onClick={() => handleDelete(org.id)}
                                             className="text-red-500 hover:text-red-700 font-medium transition-colors"

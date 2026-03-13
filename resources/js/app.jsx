@@ -14,10 +14,12 @@ import Users from './pages/Users';
 import Reports from './pages/Reports';
 import EntityTypes from './pages/EntityTypes';
 import Devices from './pages/Devices';
+import Branding from './pages/Branding';
 
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import OrganizationList from './pages/organizations/OrganizationList';
 import OrganizationForm from './pages/organizations/OrganizationForm';
+import OrganizationEdit from './pages/organizations/OrganizationEdit';
 
 function App() {
     return (
@@ -50,6 +52,7 @@ function App() {
                         <Route index element={<Navigate to="tenants" replace />} />
                         <Route path="tenants" element={<OrganizationList />} />
                         <Route path="tenants/new" element={<OrganizationForm />} />
+                        <Route path="tenants/:id/edit" element={<OrganizationEdit />} />
                     </Route>
 
                     {/* ORGANIZATION ADMIN ROUTES */}
@@ -66,6 +69,7 @@ function App() {
                         <Route path="reports" element={<Reports />} />
                         <Route path="entity-types" element={<EntityTypes />} />
                         <Route path="devices" element={<Devices />} />
+                        <Route path="branding" element={<Branding />} />
                     </Route>
 
                     {/* Catch-all */}

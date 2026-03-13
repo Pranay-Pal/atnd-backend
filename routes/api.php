@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DeviceAuthController;
 use App\Http\Controllers\Api\FaceController;
+use App\Http\Controllers\Api\OrganisationBrandingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Middleware\RequireSuperAdmin;
@@ -46,15 +47,19 @@ Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
 
     // Reports (also accessible from device)
     Route::get('/reports/attendance', [ReportController::class, 'attendance']);
+
+    // Branding sync for Device
+    Route::get('/device/branding', [OrganisationBrandingController::class, 'showPublic']);
 });
 
 // ── Authenticated Super Admin endpoints (Sanctum User token, role = admin) ──────────
 
 Route::middleware(['auth:sanctum', RequireSuperAdmin::class])->prefix('super-admin')->group(function () {
-    Route::get('/tenants', [TenantController::class, 'index']);
-    Route::post('/tenants', [TenantController::class, 'store']);
-    Route::get('/tenants/{id}', [TenantController::class, 'show']);
-    Route::delete('/tenants/{id}', [TenantController::class, 'destroy']);
+    Route::get('/tenants',                  [TenantController::class, 'index']);
+    Route::post('/tenants',                 [TenantController::class, 'store']);
+    Route::get('/tenants/{id}',             [TenantController::class, 'show']);
+    Route::post('/tenants/{id}',            [TenantController::class, 'update']); // Using POST for file uploads
+    Route::delete('/tenants/{id}',          [TenantController::class, 'destroy']);
 });
 
 // ── Authenticated admin endpoints (Sanctum User token, role = organisation) ──────────
@@ -84,6 +89,10 @@ Route::middleware(['auth:sanctum', ResolveOrganisationTenant::class])->prefix('a
     Route::get('/devices',                  [AdminDeviceController::class, 'index']);
     Route::post('/devices',                 [AdminDeviceController::class, 'store']);
     Route::delete('/devices/{id}',          [AdminDeviceController::class, 'destroy']);
+
+    // Branding management
+    Route::get('/branding',                 [OrganisationBrandingController::class, 'index']);
+    Route::post('/branding',                [OrganisationBrandingController::class, 'update']); // Use POST to allow file uploads over PUT proxy if needed, or stick to standard. Laravel handles multipart on POST better.
 
     // Reports (admin-scoped)
     Route::get('/reports/attendance', [ReportController::class, 'attendance']);
