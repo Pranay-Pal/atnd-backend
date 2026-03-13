@@ -20,7 +20,7 @@ class OrganisationBrandingController extends Controller
         $tenant = $tenantManager->get();
         return response()->json([
             'name'     => $tenant->name,
-            'settings' => $tenant->settings ?? [],
+            'settings' => $this->formatSettings($tenant->settings),
         ]);
     }
 
@@ -51,14 +51,14 @@ class OrganisationBrandingController extends Controller
         if ($request->hasFile('logo')) {
             // Delete old logo if exists
             if (isset($settings['logo_url'])) {
-                $oldPath = str_replace(url('/storage/'), '', $settings['logo_url']);
-                // Also handle cases where logo_url might be absolute without url() helper
-                $oldPath = str_replace(Storage::disk('public')->url(''), '', $settings['logo_url']);
+                $oldPath = str_replace(['url(\'/storage/\')', '/storage/'], '', $settings['logo_url']);
+                // Also handle cases where logo_url might be absolute
+                $oldPath = str_replace(url('storage/'), '', $oldPath);
                 Storage::disk('public')->delete(ltrim($oldPath, '/'));
             }
 
             $path = $request->file('logo')->store('branding', 'public');
-            $settings['logo_url'] = Storage::disk('public')->url($path);
+            $settings['logo_url'] = '/storage/' . $path;
         }
 
         $tenant->settings = $settings;
@@ -68,7 +68,7 @@ class OrganisationBrandingController extends Controller
             'message'  => 'Branding updated successfully.',
             'tenant'   => [
                 'name'     => $tenant->name,
-                'settings' => $tenant->settings,
+                'settings' => $this->formatSettings($tenant->settings),
             ],
         ]);
     }
@@ -92,7 +92,21 @@ class OrganisationBrandingController extends Controller
         return response()->json([
             'id'       => $tenant->id,
             'name'     => $tenant->name,
-            'settings' => $tenant->settings ?? [],
+            'settings' => $this->formatSettings($tenant->settings),
         ]);
+    }
+
+    private function formatSettings(array|null $settings): array
+    {
+        $settings = $settings ?? [];
+        if (isset($settings['logo_url'])) {
+            $url = $settings['logo_url'];
+            if (str_starts_with($url, '/storage/')) {
+                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $url;
+            } elseif (preg_match('/^https?:\/\/[^\/]+(\/storage\/.*)$/', $url, $matches)) {
+                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $matches[1];
+            }
+        }
+        return $settings;
     }
 }

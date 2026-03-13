@@ -19,6 +19,10 @@ class TenantController extends Controller
     public function index()
     {
         $tenants = Tenant::withCount('users')->latest()->get();
+        $tenants->transform(function ($t) {
+            $t->settings = $this->formatSettings($t->settings);
+            return $t;
+        });
         return response()->json($tenants);
     }
 
@@ -85,6 +89,7 @@ class TenantController extends Controller
     public function show(string $id)
     {
         $tenant = Tenant::with('entityTypes')->findOrFail($id);
+        $tenant->settings = $this->formatSettings($tenant->settings);
         return response()->json($tenant);
     }
 
@@ -115,15 +120,18 @@ class TenantController extends Controller
 
         if ($request->hasFile('logo')) {
             if (isset($settings['logo_url'])) {
-                $oldPath = str_replace(Storage::disk('public')->url(''), '', $settings['logo_url']);
+                $oldPath = str_replace(['url(\'/storage/\')', '/storage/'], '', $settings['logo_url']);
+                $oldPath = str_replace(\Illuminate\Support\Facades\Storage::disk('public')->url(''), '', $oldPath);
                 \Illuminate\Support\Facades\Storage::disk('public')->delete(ltrim($oldPath, '/'));
             }
             $path = $request->file('logo')->store('branding', 'public');
-            $settings['logo_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+            $settings['logo_url'] = '/storage/' . $path;
         }
 
         $tenant->settings = $settings;
         $tenant->save();
+
+        $tenant->settings = $this->formatSettings($tenant->settings);
 
         return response()->json([
             'message' => 'Organization updated successfully',
@@ -139,5 +147,19 @@ class TenantController extends Controller
         $tenant = Tenant::findOrFail($id);
         $tenant->delete();
         return response()->json(['message' => 'Organization deleted successfully']);
+    }
+
+    private function formatSettings(array|null $settings): array
+    {
+        $settings = $settings ?? [];
+        if (isset($settings['logo_url'])) {
+            $url = $settings['logo_url'];
+            if (str_starts_with($url, '/storage/')) {
+                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $url;
+            } elseif (preg_match('/^https?:\/\/[^\/]+(\/storage\/.*)$/', $url, $matches)) {
+                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $matches[1];
+            }
+        }
+        return $settings;
     }
 }
