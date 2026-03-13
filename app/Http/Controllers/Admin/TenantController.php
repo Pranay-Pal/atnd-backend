@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
+    use \App\Traits\ProvidesFormattedBranding;
+
     /**
      * Display a listing of the tenants.
      */
@@ -147,19 +149,5 @@ class TenantController extends Controller
         $tenant = Tenant::findOrFail($id);
         $tenant->delete();
         return response()->json(['message' => 'Organization deleted successfully']);
-    }
-
-    private function formatSettings(array|null $settings): array
-    {
-        $settings = $settings ?? [];
-        if (isset($settings['logo_url'])) {
-            $url = $settings['logo_url'];
-            if (str_starts_with($url, '/api/branding-image?path=')) {
-                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $url;
-            } elseif (preg_match('/^https?:\/\/[^\/]+(\/api\/branding-image\?path=.*)$/', $url, $matches)) {
-                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $matches[1];
-            }
-        }
-        return $settings;
     }
 }

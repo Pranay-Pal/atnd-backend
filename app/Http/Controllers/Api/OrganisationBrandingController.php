@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Storage;
 
 class OrganisationBrandingController extends Controller
 {
+    use \App\Traits\ProvidesFormattedBranding;
+
     /**
      * GET /api/admin/branding
      * Display current organization branding info.
@@ -94,19 +96,5 @@ class OrganisationBrandingController extends Controller
             'name'     => $tenant->name,
             'settings' => $this->formatSettings($tenant->settings),
         ]);
-    }
-
-    private function formatSettings(array|null $settings): array
-    {
-        $settings = $settings ?? [];
-        if (isset($settings['logo_url'])) {
-            $url = $settings['logo_url'];
-            if (str_starts_with($url, '/api/branding-image?path=')) {
-                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $url;
-            } elseif (preg_match('/^https?:\/\/[^\/]+(\/api\/branding-image\?path=.*)$/', $url, $matches)) {
-                $settings['logo_url'] = request()->getSchemeAndHttpHost() . $matches[1];
-            }
-        }
-        return $settings;
     }
 }

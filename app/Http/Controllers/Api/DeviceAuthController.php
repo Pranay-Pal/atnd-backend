@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Hash;
 
 class DeviceAuthController extends Controller
 {
+    use \App\Traits\ProvidesFormattedBranding;
+
     /**
      * POST /api/device/register
      * Body: { domain: string, api_key: string }
@@ -69,7 +71,7 @@ class DeviceAuthController extends Controller
             'tenant' => [
                 'id'       => $tenant->id,
                 'name'     => $tenant->name,
-                'settings' => $tenant->settings ?? (object) [],
+                'settings' => $this->formatSettings($tenant->settings),
             ],
             'entity_types' => $entityTypes,
         ]);
