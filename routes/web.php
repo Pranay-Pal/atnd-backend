@@ -36,15 +36,6 @@ Route::get('/setup', function () {
     }
 });
 
-// Fallback to safely serve uploaded public files if Hostinger/shared-hosting symlinks fail.
-Route::get('/storage/{path}', function (string $path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (!file_exists($fullPath)) {
-        abort(404);
-    }
-    return response()->file($fullPath);
-})->where('path', '.*');
-
 Route::get('/{any?}', function () {
     return view('admin');
 })->where('any', '.*');

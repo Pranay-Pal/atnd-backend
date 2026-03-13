@@ -19,6 +19,19 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/ping', fn () => response()->json(['status' => 'ok']));
 
+// Image serving route to bypass Hostinger CDN /storage/ blocking
+Route::get('/branding-image', function (Illuminate\Http\Request $request) {
+    $path = $request->query('path');
+    if (!$path) abort(404);
+    $fullPath = storage_path('app/public/' . urldecode($path));
+    if (!file_exists($fullPath)) abort(404);
+    $mimeType = \Illuminate\Support\Facades\File::mimeType($fullPath);
+    return response()->file($fullPath, [
+        'Content-Type' => $mimeType,
+        'Cache-Control' => 'public, max-age=86400'
+    ]);
+});
+
 // Phase 1: tablet provisioning — domain + api_key → token + branding + entity_types
 Route::post('/device/register', [DeviceAuthController::class, 'register']);
 

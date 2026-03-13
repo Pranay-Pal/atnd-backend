@@ -51,14 +51,14 @@ class OrganisationBrandingController extends Controller
         if ($request->hasFile('logo')) {
             // Delete old logo if exists
             if (isset($settings['logo_url'])) {
-                $oldPath = str_replace(['url(\'/storage/\')', '/storage/'], '', $settings['logo_url']);
+                $oldPath = str_replace(url('/api/branding-image?path='), '', $settings['logo_url']);
                 // Also handle cases where logo_url might be absolute
-                $oldPath = str_replace(url('storage/'), '', $oldPath);
-                Storage::disk('public')->delete(ltrim($oldPath, '/'));
+                $oldPath = str_replace('/api/branding-image?path=', '', $oldPath);
+                Storage::disk('public')->delete(urldecode(ltrim($oldPath, '/')));
             }
 
             $path = $request->file('logo')->store('branding', 'public');
-            $settings['logo_url'] = '/storage/' . $path;
+            $settings['logo_url'] = '/api/branding-image?path=' . urlencode($path);
         }
 
         $tenant->settings = $settings;
@@ -101,9 +101,9 @@ class OrganisationBrandingController extends Controller
         $settings = $settings ?? [];
         if (isset($settings['logo_url'])) {
             $url = $settings['logo_url'];
-            if (str_starts_with($url, '/storage/')) {
+            if (str_starts_with($url, '/api/branding-image?path=')) {
                 $settings['logo_url'] = request()->getSchemeAndHttpHost() . $url;
-            } elseif (preg_match('/^https?:\/\/[^\/]+(\/storage\/.*)$/', $url, $matches)) {
+            } elseif (preg_match('/^https?:\/\/[^\/]+(\/api\/branding-image\?path=.*)$/', $url, $matches)) {
                 $settings['logo_url'] = request()->getSchemeAndHttpHost() . $matches[1];
             }
         }
