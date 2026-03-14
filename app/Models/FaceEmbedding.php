@@ -40,6 +40,6 @@ class FaceEmbedding extends Model
     {
         $raw = $this->getRawOriginal('embedding');
         $count = strlen($raw) / 4; // float32 = 4 bytes
-        return array_values(unpack("f{$count}", $raw));
+        return array_values(unpack("g{$count}", $raw));
     }
 }
