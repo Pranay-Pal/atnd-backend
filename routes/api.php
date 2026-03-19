@@ -21,10 +21,24 @@ Route::get('/ping', fn () => response()->json(['status' => 'ok']));
 
 // Image serving route to bypass Hostinger CDN /storage/ blocking
 Route::get('/branding-image', function (Illuminate\Http\Request $request) {
-    $path = $request->query('path');
-    if (!$path) abort(404);
-    $fullPath = storage_path('app/public/' . urldecode($path));
-    if (!file_exists($fullPath)) abort(404);
+    $path = (string) $request->query('path', '');
+    if ($path === '') {
+        abort(404);
+    }
+
+    $decoded = ltrim(str_replace("\0", '', urldecode($path)), '/\\');
+    $baseDir = realpath(storage_path('app/public'));
+    if ($baseDir === false) {
+        abort(404);
+    }
+
+    $fullPath = realpath($baseDir . DIRECTORY_SEPARATOR . $decoded);
+    $isInsideStorage = $fullPath !== false
+        && str_starts_with($fullPath, $baseDir . DIRECTORY_SEPARATOR);
+    if (!$isInsideStorage || !is_file($fullPath)) {
+        abort(404);
+    }
+
     $mimeType = \Illuminate\Support\Facades\File::mimeType($fullPath);
     return response()->file($fullPath, [
         'Content-Type' => $mimeType,

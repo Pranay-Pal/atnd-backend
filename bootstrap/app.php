@@ -19,9 +19,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // Return JSON for API routes that throw unhandled exceptions
         $exceptions->render(function (\Throwable $e, Request $request) {
             if ($request->is('api/*')) {
+                $status = method_exists($e, 'getStatusCode')
+                    ? (int) $e->getStatusCode()
+                    : 500;
+                $isServerError = $status >= 500;
+                $message = ($isServerError && !config('app.debug'))
+                    ? 'Internal server error.'
+                    : $e->getMessage();
+
                 return response()->json([
-                    'message' => $e->getMessage(),
-                ], method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500);
+                    'message' => $message,
+                ], $status);
             }
         });
     })->create();

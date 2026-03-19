@@ -3,8 +3,16 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/setup', function () {
-    if (env('APP_ENV') === 'production' && !env('ALLOW_SETUP', false)) {
-        return response()->json(['error' => 'Setup is disabled. Please set ALLOW_SETUP=true in .env'], 403);
+    if (!env('ALLOW_SETUP', false)) {
+        return response()->json(['error' => 'Setup is disabled.'], 403);
+    }
+
+    $setupToken = env('SETUP_TOKEN');
+    if (!empty($setupToken)) {
+        $providedToken = (string) request()->query('token', '');
+        if (!hash_equals((string) $setupToken, $providedToken)) {
+            return response()->json(['error' => 'Invalid setup token.'], 403);
+        }
     }
 
     try {

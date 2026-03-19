@@ -9,6 +9,7 @@ use App\Services\TenantManager;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceController extends Controller
 {
@@ -55,58 +56,78 @@ class AttendanceController extends Controller
 
         $device   = $request->user();
         $tenantId = $device->tenant_id;
+        $hasLocalIdColumn = Schema::hasColumn('attendance_logs', 'local_id');
 
         $synced = [];
         $failed = [];
 
         foreach ($data['records'] as $rec) {
-            $user = User::withoutGlobalScopes()
-                ->where('id', $rec['user_id'])
-                ->where('tenant_id', $tenantId)
-                ->first();
+            try {
+                $recordedAt = Carbon::parse($rec['recorded_at'])->utc();
 
-            if (!$user) {
-                $failed[] = ['local_id' => $rec['local_id'], 'reason' => 'User not found.'];
-                continue;
-            }
-
-            // 1. Network Idempotency (prevent double sync if device retries)
-            $existingSync = AttendanceLog::where('tenant_id', $tenantId)
-                ->where('device_id', $device->id)
-                ->where('metadata->local_id', $rec['local_id'])
-                ->first();
-            
-            if ($existingSync) {
-                $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existingSync->id];
-                continue;
-            }
-
-            // 2. Business Logic Guard (no double check-ins per day)
-            if ($rec['type'] === 'check_in') {
-                $existing = AttendanceLog::where('user_id', $rec['user_id'])
+                $user = User::withoutGlobalScopes()
+                    ->where('id', $rec['user_id'])
                     ->where('tenant_id', $tenantId)
-                    ->where('type', 'check_in')
-                    ->whereDate('recorded_at', Carbon::parse($rec['recorded_at'])->toDateString())
                     ->first();
-                if ($existing) {
-                    $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existing->id];
+
+                if (!$user) {
+                    $failed[] = ['local_id' => $rec['local_id'], 'reason' => 'User not found.'];
                     continue;
                 }
+
+                // 1. Network idempotency (prevent duplicate sync on retries)
+                $existingSync = AttendanceLog::where('tenant_id', $tenantId)
+                    ->where('device_id', $device->id)
+                    ->where(function ($q) use ($rec, $hasLocalIdColumn) {
+                        if ($hasLocalIdColumn) {
+                            $q->where('local_id', $rec['local_id'])
+                                ->orWhere('metadata->local_id', $rec['local_id']);
+                        } else {
+                            $q->where('metadata->local_id', $rec['local_id']);
+                        }
+                    })
+                    ->first();
+
+                if ($existingSync) {
+                    $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existingSync->id];
+                    continue;
+                }
+
+                // 2. Business rule: only one check-in per user per UTC day
+                if ($rec['type'] === 'check_in') {
+                    $existing = AttendanceLog::where('user_id', $rec['user_id'])
+                        ->where('tenant_id', $tenantId)
+                        ->where('type', 'check_in')
+                        ->whereDate('recorded_at', $recordedAt->toDateString())
+                        ->first();
+                    if ($existing) {
+                        $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $existing->id];
+                        continue;
+                    }
+                }
+
+                $payload = [
+                    'tenant_id'   => $tenantId,
+                    'user_id'     => $rec['user_id'],
+                    'type'        => $rec['type'],
+                    'recorded_at' => $recordedAt,
+                    'device_id'   => $device->id,
+                    'similarity'  => $rec['similarity'] ?? null,
+                    'synced'      => true,
+                    'metadata'    => ['local_id' => $rec['local_id']],
+                ];
+                if ($hasLocalIdColumn) {
+                    $payload['local_id'] = $rec['local_id'];
+                }
+                $log = AttendanceLog::create($payload);
+
+                $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $log->id];
+            } catch (\Throwable $e) {
+                $failed[] = [
+                    'local_id' => $rec['local_id'],
+                    'reason' => 'Failed to save record.',
+                ];
             }
-
-            $log = AttendanceLog::create([
-                'tenant_id'   => $tenantId,
-                'user_id'     => $rec['user_id'],
-                'type'        => $rec['type'],
-                'recorded_at' => $rec['recorded_at'],
-                'device_id'   => $device->id,
-                'similarity'  => $rec['similarity'] ?? null,
-                'synced'      => true,
-                'metadata'    => ['local_id' => $rec['local_id']],
-            ]);
-
-            // Return both local_id (to match device record) and server_id (DB primary key)
-            $synced[] = ['local_id' => $rec['local_id'], 'server_id' => $log->id];
         }
 
         return response()->json(['synced' => $synced, 'failed' => $failed]);
@@ -183,13 +204,15 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'User not found in tenant.'], 404);
         }
 
-        $recordedAt = $data['recorded_at'] ?? now();
+        $recordedAt = isset($data['recorded_at'])
+            ? Carbon::parse($data['recorded_at'])->utc()
+            : now()->utc();
 
         if ($type === 'check_in') {
             $existing = AttendanceLog::where('user_id', $data['user_id'])
                 ->where('tenant_id', $tenantId)
                 ->where('type', 'check_in')
-                ->whereDate('recorded_at', Carbon::parse($recordedAt)->toDateString())
+                ->whereDate('recorded_at', $recordedAt->toDateString())
                 ->first();
             
             if ($existing) {

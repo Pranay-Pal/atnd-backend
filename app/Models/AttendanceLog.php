@@ -14,6 +14,7 @@ class AttendanceLog extends Model
         'type',
         'recorded_at',
         'device_id',
+        'local_id',
         'similarity',
         'synced',
         'metadata',
